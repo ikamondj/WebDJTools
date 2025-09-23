@@ -24,3 +24,7 @@ x64/Release/WebDJ.dll
 x64/Release/WebDJ.lib
 webrtc-checkout/depot_tools/
 webrtc-checkout/webrtc-checkout/src/
+/Node
+/webrtc-checkout/webrtc-checkout
+/Juce
+Node.zip

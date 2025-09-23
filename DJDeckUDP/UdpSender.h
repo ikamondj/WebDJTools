@@ -2,49 +2,51 @@
 #define MYPLUGIN8_H
 
 #include <stdio.h>
-
-#include "vdjPlugin8.h"
+#include "vdjDsp8.h"
 #include <string>
 #include <iostream>
-#include <string>
 #include <thread>
 #include <ws2tcpip.h>
 #include <chrono>
+#include <vector>
+#include <array>
 #include <winsock2.h>
+#include <atomic>
 
 class UDPTrackInfoSender : public IVdjPlugin8
 {
 private:
-	bool running;
-	int frequencyMs;
-	std::thread senderThread;
-	SOCKET udpSocket;
-	sockaddr_in serverAddr;
-	std::string GetInfoText(const std::basic_string<char>& command);
-	double GetInfoDouble(const std::basic_string<char>& command);
-	void SendTrackInfo();
+    std::atomic<bool> running{ false };
+    int frequencyMs = 1000;
+    std::thread senderThread;
+    SOCKET udpSocket = INVALID_SOCKET;
+    sockaddr_in serverAddr{};
+
+    std::string GetInfoText(const std::string& command);
+    double GetInfoDouble(const std::string& command);
+    void SendTrackInfo();
+
 public:
-	
-	HRESULT VDJ_API OnLoad();
-	HRESULT VDJ_API OnGetPluginInfo(TVdjPluginInfo8* infos);
-	ULONG VDJ_API Release();
-	HRESULT VDJ_API OnGetUserInterface(TVdjPluginInterface8* pluginInterface);
-	HRESULT VDJ_API OnParameter(int id);
-	HRESULT VDJ_API OnGetParameterString(int id, char* outParam, int outParamSize);
+    HRESULT VDJ_API OnLoad();
+    HRESULT VDJ_API OnGetPluginInfo(TVdjPluginInfo8* infos);
+    ULONG VDJ_API Release();
+    HRESULT VDJ_API OnGetUserInterface(TVdjPluginInterface8* pluginInterface) override;
+    HRESULT VDJ_API OnParameter(int id) override;
+    HRESULT VDJ_API OnGetParameterString(int id, char* outParam, int outParamSize) override;
 
 private:
-	int m_Reset;
-	float m_Dry;
-	float m_Wet;
+    int m_Reset = 0;
+    float m_Dry = 0.0f;
+    float m_Wet = 0.0f;
 
-	bool isMasterFX(); // an example of additional function for the use of GetInfo()
+    bool isMasterFX(); // an example of additional function for the use of GetInfo()
 
 protected:
-	typedef enum _ID_Interface
-	{
-		ID_BUTTON_1,
-		ID_SLIDER_1
-	} ID_Interface;
+    enum ID_Interface
+    {
+        ID_BUTTON_1,
+        ID_SLIDER_1
+    };
 };
 
 #endif

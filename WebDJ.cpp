@@ -2,14 +2,13 @@
 #include <windows.h>
 #include <string>
 #include "vdjOnlineSource.h"
-#include "vdjDsp8.h"
 #include "WebRTCConnection.hpp"
 
 class WebDJPlugin : public IVdjPluginOnlineSource {
 public:
     char commandBuffer[4096];
     HRESULT VDJ_API OnLoad() override {
-        OutputDebugStringA("WebDJ Plugin Loaded\n");
+        ShowMessageBox(L"Hello Loaded!");
 
         // Declare a custom command for WebDJ
         DeclareParameterCommand(commandBuffer, 1, "WebDJ Command", "WebDJ", sizeof(commandBuffer));
@@ -24,6 +23,14 @@ public:
         infos->Version = "0.1";
         return S_OK;
     }
+
+
+
+    // Example function to show a message box
+    void ShowMessageBox(const WCHAR* message) {
+        MessageBoxW(NULL, message, L"WebDJ Plugin Debug", MB_ICONINFORMATION | MB_OK);
+    }
+
 
     float GetNextWebDJStreamSample() {
         return 0;
@@ -41,8 +48,8 @@ public:
     // Inherited via IVdjPluginOnlineSource
     HRESULT VDJ_API OnSearch(const char* search, IVdjTracksList* tracksList) override
     {
-        tracksList->add("0abingustest1", "test-track", "ikamon", "remix", "house", "label", "comment", "coverURL", "http://127.0.0.1:5959", 3600.f, 130, 5, 2025, false, false);
-        SendCommand("browser_refresh");
+        ShowMessageBox(L"Hello Search!");
+        tracksList->add("0abingustest1", "test-track", "ikamon");
         return S_OK;
     }
 

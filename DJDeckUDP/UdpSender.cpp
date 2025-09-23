@@ -1,157 +1,122 @@
 #include "pch.h"
 #include "UdpSender.h"
 #include "vdjPlugin8.h"
-
 #include "json.hpp"
 
+#include <thread>
+#include <chrono>
+
 #pragma comment(lib, "ws2_32.lib")
+
 using json = nlohmann::json;
-std::string UDPTrackInfoSender::GetInfoText(const std::basic_string<char>& command) {
-	char output[1024];
-	GetInfo(command.c_str(), (double*)output);
-	return std::string(&output[0]);
+
+std::string UDPTrackInfoSender::GetInfoText(const std::string& command) {
+    char output[1024] = { 0 };
+    HRESULT result = GetStringInfo(command.c_str(), output, sizeof(output));
+    return (result == S_OK) ? std::string(output) : "";
 }
 
-double UDPTrackInfoSender::GetInfoDouble(const std::basic_string<char>& command) {
-	double d;
-	GetInfo(command.c_str(), &d);
-	return d;
+double UDPTrackInfoSender::GetInfoDouble(const std::string& command) {
+    double d;
+    GetInfo(command.c_str(), &d);
+    return d;
 }
 
-void UDPTrackInfoSender::SendTrackInfo()
-{
-	while (running)
-	{
-		json payload;
-		for (int deck = 1; deck <= 4; ++deck)
-		{
-			std::string title, artist;
-			double playPos, audible;
+void UDPTrackInfoSender::SendTrackInfo() {
+    json payload;
+    while (running.load()) {
+        bool anyDeckPlaying = false;
+        payload.clear();
 
-			title = GetInfoText("deck " + std::to_string(deck) + " get_loaded_song");
-			artist = GetInfoText("deck " + std::to_string(deck) + " get_song_artist");
-			playPos = GetInfoDouble("deck " + std::to_string(deck) + " get_position");
-			audible = GetInfoDouble("deck " + std::to_string(deck) + " is_audible");
+        for (int deck = 1; deck <= 4; ++deck) {
+            std::string title = GetInfoText("deck " + std::to_string(deck) + " get_title");
+            std::string artist = GetInfoText("deck " + std::to_string(deck) + " get_artist");
+            double playPos = GetInfoDouble("deck " + std::to_string(deck) + " get_position");
+            double audible = GetInfoDouble("deck " + std::to_string(deck) + " is_audible");
 
-			if (audible > 0.0f && playPos > 0.0f && playPos < 1.0f)
-			{
-				payload["deck" + std::to_string(deck)] = {
-					{"title", title},
-					{"artist", artist}
-				};
-			}
-			else
-			{
-				payload["deck" + std::to_string(deck)] = {
-					{"title", ""},
-					{"artist", ""}
-				};
-			}
-		}
+            if (audible > 0.1f && playPos >= -0.01 && playPos <= 1.01) {
+                anyDeckPlaying = true;
+                payload["deck" + std::to_string(deck)] = { {"title", title}, {"artist", artist} };
+            }
+        }
 
-		std::string jsonStr = payload.dump();
-		sendto(udpSocket, jsonStr.c_str(), jsonStr.size(), 0, (sockaddr*)&serverAddr, sizeof(serverAddr));
+        if (anyDeckPlaying) {
+            std::string jsonStr = payload.dump();
+            sendto(udpSocket, jsonStr.c_str(), (int)jsonStr.size(), 0, (sockaddr*)&serverAddr, sizeof(serverAddr));
+        }
 
-		std::this_thread::sleep_for(std::chrono::milliseconds(frequencyMs));
-	}
+        // shorter sleep chunks to allow fast shutdown
+        const int chunkMs = 10;
+        int remaining = frequencyMs;
+        while (running.load() && remaining > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(min(chunkMs, remaining)));
+            remaining -= chunkMs;
+        }
+    }
 }
 
 //-----------------------------------------------------------------------------
-HRESULT VDJ_API UDPTrackInfoSender::OnLoad()
-{
-	WSADATA wsaData;
-	WSAStartup(MAKEWORD(2, 2), &wsaData);
-	udpSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-
-	serverAddr.sin_family = AF_INET;
-	serverAddr.sin_port = htons(5000); // Set target UDP port
-	serverAddr.sin_addr.s_addr = InetPton(AF_INET, L"127.0.0.1", &serverAddr.sin_addr);
-
-	running = true;
-	senderThread = std::thread(&UDPTrackInfoSender::SendTrackInfo, this);
-	auto loadMsg = std::string("UDP Plugin Loaded!");
-	auto dbg = std::string("Debug");
-	MessageBoxW(NULL, std::wstring(loadMsg.begin(), loadMsg.end()).c_str(), std::wstring(dbg.begin(), dbg.end()).c_str(), MB_OK);
-	return S_OK;
-}
+// VDJ Plugin Lifecycle Methods
 //-----------------------------------------------------------------------------
-HRESULT VDJ_API UDPTrackInfoSender::OnGetPluginInfo(TVdjPluginInfo8* infos)
-{
-	infos->PluginName = "UDPSender";
-	infos->Author = "Ikamon";
-	infos->Description = "Sends currently playing decks via UDP";
-	infos->Version = "1.0";
-	infos->Flags = 0x00;
-	infos->Bitmap = NULL;
+HRESULT VDJ_API UDPTrackInfoSender::OnLoad() {
+    WSADATA wsaData;
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+        return E_FAIL;
+    }
 
-	return S_OK;
-}
-//---------------------------------------------------------------------------
-ULONG VDJ_API UDPTrackInfoSender::Release()
-{
-	running = false;
-	if (senderThread.joinable())
-	{
-		senderThread.join();
-	}
-	closesocket(udpSocket);
-	WSACleanup();
-	return S_OK;
+    udpSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (udpSocket == INVALID_SOCKET) {
+        WSACleanup();
+        return E_FAIL;
+    }
 
-	delete this;
-	return 0;
-}
-//---------------------------------------------------------------------------
-HRESULT VDJ_API UDPTrackInfoSender::OnGetUserInterface(TVdjPluginInterface8* pluginInterface)
-{
-	pluginInterface->Type = VDJINTERFACE_DEFAULT;
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(5000);
+    InetPton(AF_INET, L"127.0.0.1", &serverAddr.sin_addr);
 
-	return S_OK;
-}
-//---------------------------------------------------------------------------
-HRESULT VDJ_API UDPTrackInfoSender::OnParameter(int id)
-{
-	switch (id)
-	{
-	case ID_BUTTON_1:
-		if (m_Reset == 1)
-		{
-			m_Wet = 0.5f;
-			//HRESULT hr;
-			//hr = SendCommand("effect_slider 1 50%");
-		}
-		break;
+    running.store(true);
+    senderThread = std::thread(&UDPTrackInfoSender::SendTrackInfo, this);
 
-	case ID_SLIDER_1:
-		m_Dry = 1 - m_Wet;
-		break;
-	}
-
-	return S_OK;
-}
-//---------------------------------------------------------------------------
-HRESULT VDJ_API UDPTrackInfoSender::OnGetParameterString(int id, char* outParam, int outParamSize)
-{
-	switch (id)
-	{
-	case ID_SLIDER_1:
-		sprintf(outParam, "+%.0f%%", m_Wet * 100);
-		break;
-	}
-
-	return S_OK;
+    return S_OK;
 }
 
-//-------------------------------------------------------------------------------------------------------------------------------------
-// BELOW, ADDITIONAL FUNCTIONS ONLY TO EXPLAIN SOME FEATURES (CAN BE REMOVED)
-//-------------------------------------------------------------------------------------------------------------------------------------
-bool UDPTrackInfoSender::isMasterFX()
-{
-	double qRes;
-	HRESULT hr = S_FALSE;
+HRESULT VDJ_API UDPTrackInfoSender::OnGetPluginInfo(TVdjPluginInfo8* infos) {
+    infos->PluginName = "UDPSender";
+    infos->Author = "Ikamon";
+    infos->Description = "Sends track metadata and PCM audio over UDP";
+    infos->Version = "2.0";
+    infos->Flags = 0x00;
+    infos->Bitmap = NULL;
+    return S_OK;
+}
 
-	hr = GetInfo("get_deck 'master' ? true : false", &qRes);
+ULONG VDJ_API UDPTrackInfoSender::Release() {
+    running.store(false);
 
-	if (qRes == 1.0f) return true;
-	else return false;
+    if (udpSocket != INVALID_SOCKET) {
+        shutdown(udpSocket, SD_BOTH);
+    }
+
+    if (senderThread.joinable()) {
+        senderThread.join();
+    }
+
+    if (udpSocket != INVALID_SOCKET) {
+        closesocket(udpSocket);
+        udpSocket = INVALID_SOCKET;
+    }
+    WSACleanup();
+
+    // safer: let VDJ handle deletion
+    return 0;
+}
+
+HRESULT VDJ_API UDPTrackInfoSender::OnGetUserInterface(TVdjPluginInterface8* pluginInterface) {
+    return S_OK;
+}
+HRESULT VDJ_API UDPTrackInfoSender::OnParameter(int id) {
+    return S_OK;
+}
+HRESULT VDJ_API UDPTrackInfoSender::OnGetParameterString(int id, char* outParam, int outParamSize) {
+    return S_OK;
 }

@@ -5,7 +5,9 @@ VisualStudioVersion = 17.12.35506.116
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "WebDJ", "WebDJ.vcxproj", "{A67F79D6-F8D4-4A02-AB0F-0882E72521AB}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DJDeckUDP", "..\DJDeckUDP\DJDeckUDP.vcxproj", "{05C97495-232A-47ED-85A3-F5B2EE4E6E56}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DJDeckUDP", "DJDeckUDP\DJDeckUDP.vcxproj", "{05C97495-232A-47ED-85A3-F5B2EE4E6E56}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "VJDeckTCP", "VJDeckTCP\VJDeckTCP.vcxproj", "{61D45DB2-392C-47AD-98AC-2BBCDCF38073}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -31,6 +33,14 @@ Global
 		{05C97495-232A-47ED-85A3-F5B2EE4E6E56}.Release|x64.Build.0 = Release|x64
 		{05C97495-232A-47ED-85A3-F5B2EE4E6E56}.Release|x86.ActiveCfg = Release|Win32
 		{05C97495-232A-47ED-85A3-F5B2EE4E6E56}.Release|x86.Build.0 = Release|Win32
+		{61D45DB2-392C-47AD-98AC-2BBCDCF38073}.Debug|x64.ActiveCfg = Debug|x64
+		{61D45DB2-392C-47AD-98AC-2BBCDCF38073}.Debug|x64.Build.0 = Debug|x64
+		{61D45DB2-392C-47AD-98AC-2BBCDCF38073}.Debug|x86.ActiveCfg = Debug|Win32
+		{61D45DB2-392C-47AD-98AC-2BBCDCF38073}.Debug|x86.Build.0 = Debug|Win32
+		{61D45DB2-392C-47AD-98AC-2BBCDCF38073}.Release|x64.ActiveCfg = Release|x64
+		{61D45DB2-392C-47AD-98AC-2BBCDCF38073}.Release|x64.Build.0 = Release|x64
+		{61D45DB2-392C-47AD-98AC-2BBCDCF38073}.Release|x86.ActiveCfg = Release|Win32
+		{61D45DB2-392C-47AD-98AC-2BBCDCF38073}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
